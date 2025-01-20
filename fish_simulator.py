@@ -5,7 +5,7 @@
 import random
 
 
-def equal(a, b, eps=1e-5):
+def equal(a, b, eps=1e-4):
     """
     :param a: number to compare
     :param b: number to compare
@@ -38,10 +38,26 @@ class FishSimulator:
         self.perfect = None
         self.reset(level=10, motion_type=0, difficulty=100)
 
+    def get_draw_state(self):
+        """
+        :return: states
+        """
+        return [self.bobber_bar_height, self.bobber_position, self.bobber_bar_pos,
+                self.distance_from_catching]
+
+    def resetRandomly(self):
+        level = random.randint(7, 12)
+        motion_type = random.randint(0, 4)
+        difficulty = random.randint(40, 130)
+        self.reset(level, motion_type, difficulty)
+        return [self.bobber_bar_height, self.bobber_position, self.bobber_bar_pos,
+                 self.bobber_in_bar, self.bobber_bar_speed, self.distance_from_catching, self.perfect]
+
     def reset(self, level=10, motion_type=0, difficulty=100):
         """
         :param level: fishing level
         :param motion_type: fish motion type
+            mixed = 0, dart = 1, smooth = 2, sink = 3, floater = 4
         :param difficulty: fish difficulty
         """
         self.bobber_bar_height = 96 + level * 8
@@ -71,13 +87,13 @@ class FishSimulator:
             num1 = 548 - self.bobber_position
             tmp_bobber_position = self.bobber_position
             num2 = min(99, self.difficulty + random.randint(10, 45)) / 100
-            self.bobber_target_position = self.bobber_position + random.randint(int(min(tmp_bobber_position, num1)), int(num1)) * num2
+            self.bobber_target_position = self.bobber_position + random.randint(int(min(-tmp_bobber_position, num1)), int(num1)) * num2
 
         if self.motion_type == 4:
-            self.floater_sinker_acceleration = max(self.floater_sinker_acceleration - 0.01, 1.5)
+            self.floater_sinker_acceleration = max(self.floater_sinker_acceleration - 0.01, -1.5)
 
         elif self.motion_type == 3:
-            self.floater_sinker_acceleration = max(self.floater_sinker_acceleration + 0.01, 1.5)
+            self.floater_sinker_acceleration = min(self.floater_sinker_acceleration + 0.01, 1.5)
 
         if abs(self.bobber_position - self.bobber_target_position) > 3 and self.bobber_target_position != -1:
             self.bobber_acceleration = (self.bobber_target_position - self.bobber_position) / (
@@ -112,7 +128,7 @@ class FishSimulator:
             self.bobber_in_bar = True
 
         self.button_pressed = button_pressed
-        num4 = -0.25 if self.button_pressed == 0 else 0.25
+        num4 = -0.25 if self.button_pressed else 0.25
         if self.button_pressed and num4 < 0.0 and (
                 equal(self.bobber_bar_pos, 0) or equal(self.bobber_bar_pos, (568 - self.bobber_bar_height))):
             self.bobber_bar_speed = 0.0
@@ -142,20 +158,27 @@ class FishSimulator:
 
         if self.distance_from_catching >= 1:
             reward = 50 + (200 if self.perfect else 0)
-        elif self.distance_from_catching <= 0:
-            reward = -50
-        else:
-            reward = 1 if self.bobber_in_bar else -1
-            if break_perfect:
-                reward -= 10
-            if self.perfect:
-                reward += 0.5
 
-        # Return: [states], Rewards, Done, Info
-        return [self.bobber_bar_height, self.bobber_position, self.bobber_bar_pos,
-                self.bobber_target_position, self.floater_sinker_acceleration,
-                self.bobber_acceleration, self.bobber_speed, self.bobber_in_bar,
-                self.bobber_bar_speed, self.distance_from_catching, self.perfect], reward, True, {}
+            return ([self.bobber_bar_height / 568, self.bobber_position / 568, self.bobber_bar_pos / 568,
+                    self.bobber_in_bar, self.bobber_bar_speed, self.distance_from_catching, self.perfect],
+                    reward, True, {})
+        if self.distance_from_catching <= 0:
+            reward = -50
+
+            return ([self.bobber_bar_height, self.bobber_position, self.bobber_bar_pos,
+                     self.bobber_in_bar, self.bobber_bar_speed, self.distance_from_catching, self.perfect],
+                    reward, True, {})
+
+        reward = 1 if self.bobber_in_bar else -1
+        if break_perfect:
+            reward -= 10
+        if self.perfect:
+            reward += 0.5
+
+        return ([self.bobber_bar_height, self.bobber_position, self.bobber_bar_pos,
+                 self.bobber_in_bar, self.bobber_bar_speed, self.distance_from_catching, self.perfect],
+                reward, False, {})
+
 
 if __name__ == '__main__':
     pass
